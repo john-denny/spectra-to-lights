@@ -17,6 +17,3 @@ dependencies = [
 
 [tool.hatch.build.targets.wheel]
 packages = ["spectrum_to_lights"]
-
-[tool.hatch.build.targets.wheel.force-include]
-"spectrum_to_lights/data" = "spectrum_to_lights/data"
