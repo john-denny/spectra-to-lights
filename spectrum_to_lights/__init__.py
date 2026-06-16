@@ -46,12 +46,13 @@ class SpectralSolver:
 
     def _best(self, t: np.ndarray) -> np.ndarray:
         x0 = seed_from_spectrum(t)
-        best_x, best_sam = None, float("inf")
-        for solver in SOLVERS.values():
+        best_x, best_sam, best_name = None, float("inf"), None
+        for name, solver in SOLVERS.items():
             x = np.clip(solver.solve(self._A, t, x0), 0, 1)
             sam, _, _ = match_quality(self._A, x, t)
             if sam < best_sam:
-                best_sam, best_x = sam, x
+                best_sam, best_x, best_name = sam, x, name
+        print(f"Best solver: {best_name} (SAM={best_sam:.2f}°)")
         return best_x
 
     def solve(
