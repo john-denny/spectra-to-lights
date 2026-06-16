@@ -1,0 +1,22 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "spectra-to-lights"
+version = "0.1.0"
+description = "Spectral matching solver for a 24-channel LED array"
+requires-python = ">=3.11"
+dependencies = [
+    "numpy>=1.24",
+    "pandas>=1.5",
+    "plotly>=5.0",
+    "scikit-learn>=1.0",
+    "scipy>=1.10",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["spectrum_to_lights"]
+
+[tool.hatch.build.targets.wheel.force-include]
+"spectrum_to_lights/data" = "spectrum_to_lights/data"
