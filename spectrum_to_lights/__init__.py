@@ -13,7 +13,7 @@ from ._lib import (
     save_plot,
     seed_from_spectrum,
 )
-from ._solvers import DEFAULT_SOLVER, get_solver
+from ._solvers import DEFAULT_SOLVER, SOLVERS, get_solver
 
 __all__ = ["SpectralSolver"]
 
@@ -25,18 +25,34 @@ class SpectralSolver:
     ----------
     solver:
         Default solver name. One of: lsq_linear, nnls, lasso, ridge,
-        elastic_net, diffevo, weighted_ls, pgd, admm, dual_annealing, huber.
+        elastic_net, diffevo, weighted_ls, pgd, admm, dual_annealing, huber,
+        or "all" to run every solver and return the best result by SAM.
     """
 
     def __init__(self, solver: str = DEFAULT_SOLVER) -> None:
         self._A = load_matrix()
         self._default_solver = solver
 
+    def _load(self, target: "str | pathlib.Path | np.ndarray") -> np.ndarray:
+        return load_target(str(target)) if not isinstance(target, np.ndarray) else target
+
     def _run(self, target: "str | pathlib.Path | np.ndarray", solver_name: str | None) -> tuple[np.ndarray, np.ndarray]:
-        t = load_target(str(target)) if not isinstance(target, np.ndarray) else target
+        t = self._load(target)
+        if (solver_name or self._default_solver) == "all":
+            return t, self._best(t)
         x0 = seed_from_spectrum(t)
         x = get_solver(solver_name or self._default_solver).solve(self._A, t, x0)
         return t, np.clip(x, 0, 1)
+
+    def _best(self, t: np.ndarray) -> np.ndarray:
+        x0 = seed_from_spectrum(t)
+        best_x, best_sam = None, float("inf")
+        for solver in SOLVERS.values():
+            x = np.clip(solver.solve(self._A, t, x0), 0, 1)
+            sam, _, _ = match_quality(self._A, x, t)
+            if sam < best_sam:
+                best_sam, best_x = sam, x
+        return best_x
 
     def solve(
         self,
