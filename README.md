@@ -56,17 +56,37 @@ The default solver is `lsq_linear` — scipy's bounded least-squares. Eleven sol
 | `dual_annealing` | Dual annealing (global) |
 | `huber` | IRLS with Huber loss (robust) |
 
-Override the solver per-call:
+Set a default solver at instantiation, or override per-call:
 
 ```python
-dmx = solver.solve("QE_green.csv", solver="huber")
+# Set default for all calls on this instance
+solver = SpectralSolver(solver="huber")
+
+# Override for a single call
+dmx = solver.solve("QE_green.csv", solver="ridge")
 solver.plot("QE_green.csv", solver="weighted_ls", out="match.html")
+```
+
+Use `solver="all"` to run every solver and automatically pick the best result by SAM:
+
+```python
+dmx = solver.solve("QE_green.csv", solver="all")
+# Prints: Best solver: huber (SAM=2.34°)
+
+# Generates a comparison plot with all solvers overlaid — best highlighted with ★
+solver.plot("QE_green.csv", solver="all", out="comparison.html")
 ```
 
 Apply a brightness scale before converting to DMX range:
 
 ```python
 dmx = solver.solve("QE_green.csv", brightness=0.8)
+```
+
+To save the plot without opening a browser:
+
+```python
+solver.plot("QE_green.csv", out="match.html", open_browser=False)
 ```
 
 ### Sending to hardware
