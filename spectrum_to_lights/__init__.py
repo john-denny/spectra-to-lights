@@ -10,8 +10,10 @@ from ._lib import (
     load_matrix,
     load_target,
     match_quality,
+    save_comparison_plot,
     save_plot,
     seed_from_spectrum,
+    zero_inactive_channels,
 )
 from ._solvers import DEFAULT_SOLVER, SOLVERS, get_solver
 
@@ -39,21 +41,24 @@ class SpectralSolver:
     def _run(self, target: "str | pathlib.Path | np.ndarray", solver_name: str | None) -> tuple[np.ndarray, np.ndarray]:
         t = self._load(target)
         if (solver_name or self._default_solver) == "all":
-            return t, self._best(t)
+            best_x, _, _ = self._run_all(t)
+            return t, best_x
         x0 = seed_from_spectrum(t)
-        x = get_solver(solver_name or self._default_solver).solve(self._A, t, x0)
-        return t, np.clip(x, 0, 1)
+        x = zero_inactive_channels(self._A, np.clip(get_solver(solver_name or self._default_solver).solve(self._A, t, x0), 0, 1))
+        return t, x
 
-    def _best(self, t: np.ndarray) -> np.ndarray:
+    def _run_all(self, t: np.ndarray) -> tuple[np.ndarray, list, str]:
         x0 = seed_from_spectrum(t)
+        solver_results = []
         best_x, best_sam, best_name = None, float("inf"), None
         for name, solver in SOLVERS.items():
-            x = np.clip(solver.solve(self._A, t, x0), 0, 1)
-            sam, _, _ = match_quality(self._A, x, t)
+            x = zero_inactive_channels(self._A, np.clip(solver.solve(self._A, t, x0), 0, 1))
+            sam, r2, rmse = match_quality(self._A, x, t)
+            solver_results.append((name, self._A @ x, sam, r2, rmse))
             if sam < best_sam:
                 best_sam, best_x, best_name = sam, x, name
         print(f"Best solver: {best_name} (SAM={best_sam:.2f}°)")
-        return best_x
+        return best_x, solver_results, best_name
 
     def solve(
         self,
@@ -111,9 +116,15 @@ class SpectralSolver:
         open_browser:
             If True, open the saved file in the default browser.
         """
-        t, x = self._run(target, solver)
-        reconstructed = self._A @ x
-        sam, r2, rmse = match_quality(self._A, x, t)
-        save_plot(WAVELENGTHS, t, reconstructed, sam, r2, rmse, out)
+        effective_solver = solver or self._default_solver
+        if effective_solver == "all":
+            t = self._load(target)
+            _, solver_results, best_name = self._run_all(t)
+            save_comparison_plot(WAVELENGTHS, t, solver_results, best_name, out)
+        else:
+            t, x = self._run(target, solver)
+            reconstructed = self._A @ x
+            sam, r2, rmse = match_quality(self._A, x, t)
+            save_plot(WAVELENGTHS, t, reconstructed, sam, r2, rmse, out)
         if open_browser:
             webbrowser.open(pathlib.Path(out).resolve().as_uri())

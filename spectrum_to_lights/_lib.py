@@ -46,23 +46,29 @@ def load_matrix() -> np.ndarray:
     cols = []
     for ch in range(1, N_CHANNELS + 1):
         wl, irr = _read_channel_file(ch)
-        col = np.interp(WAVELENGTHS, wl, irr)
-        peak = col.max()
-        if peak > 0:
-            col /= peak
-        cols.append(col)
+        cols.append(np.interp(WAVELENGTHS, wl, irr))
     A = np.column_stack(cols)
     assert A.shape == (401, N_CHANNELS)
+    global_max = A.max()
+    if global_max > 0:
+        A /= global_max
     return A
 
 
-def load_target(path: str) -> np.ndarray:
+def load_target(path: str, reference: float | None = None) -> np.ndarray:
     df = pd.read_csv(path, header=None, comment="#")
     wl = df.iloc[:, 0].to_numpy(dtype=float)
     intensity = df.iloc[:, 1].to_numpy(dtype=float)
-    if np.array_equal(wl, WAVELENGTHS):
-        return intensity
-    return np.interp(WAVELENGTHS, wl, intensity)
+    t = intensity if np.array_equal(wl, WAVELENGTHS) else np.interp(WAVELENGTHS, wl, intensity)
+    divisor = reference if reference is not None else t.max()
+    return t / divisor if divisor > 0 else t
+
+
+def zero_inactive_channels(A: np.ndarray, x: np.ndarray) -> np.ndarray:
+    """Zero coefficients for channels whose column in A is all zeros (no visible emission)."""
+    x = x.copy()
+    x[A.max(axis=0) == 0] = 0.0
+    return x
 
 
 def seed_from_spectrum(t: np.ndarray) -> np.ndarray:
@@ -156,5 +162,58 @@ def save_plot(
         legend=dict(bgcolor="#222"),
         xaxis=dict(gridcolor="#333"),
         yaxis=dict(gridcolor="#333"),
+    )
+    fig.write_html(out_path)
+
+
+def save_comparison_plot(
+    wavelengths: np.ndarray,
+    target: np.ndarray,
+    solver_results: list[tuple[str, np.ndarray, float, float, float]],
+    best_name: str,
+    out_path: str,
+) -> None:
+    """Save a multi-solver plot: best solver highlighted, others as dim dashes."""
+    fig = go.Figure()
+
+    band = 10
+    for wl in range(int(wavelengths[0]), int(wavelengths[-1]) + 1, band):
+        fig.add_vrect(
+            x0=wl, x1=wl + band,
+            fillcolor=wavelength_to_rgb(wl + band // 2),
+            opacity=0.25, layer="below", line_width=0,
+        )
+
+    fig.add_trace(go.Scatter(
+        x=wavelengths, y=target, name="Target",
+        line=dict(color="white", width=2),
+    ))
+
+    for name, recon, sam, r2, rmse in solver_results:
+        if name == best_name:
+            continue
+        colour = SOLVER_COLORS.get(name, "#aaaaaa")
+        fig.add_trace(go.Scatter(
+            x=wavelengths, y=recon,
+            name=f"{name}  SAM={sam:.1f}°  R²={r2:.3f}",
+            line=dict(color=colour, width=1.5, dash="dash"),
+        ))
+
+    for name, recon, sam, r2, rmse in solver_results:
+        if name != best_name:
+            continue
+        colour = SOLVER_COLORS.get(name, "#facc15")
+        fig.add_trace(go.Scatter(
+            x=wavelengths, y=recon,
+            name=f"★ {name}  SAM={sam:.1f}°  R²={r2:.3f}  RMSE={rmse:.4f}",
+            line=dict(color=colour, width=4),
+        ))
+
+    fig.update_layout(
+        title="Solver Comparison",
+        xaxis_title="Wavelength (nm)", yaxis_title="Intensity",
+        paper_bgcolor="#111", plot_bgcolor="#111", font_color="white",
+        legend=dict(bgcolor="#222", font=dict(size=11)),
+        xaxis=dict(gridcolor="#333"), yaxis=dict(gridcolor="#333"),
     )
     fig.write_html(out_path)
