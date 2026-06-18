@@ -166,6 +166,46 @@ def save_plot(
     fig.write_html(out_path)
 
 
+_OVERLAY_COLORS = [
+    "#facc15", "#4ade80", "#60a5fa", "#f87171", "#fb923c",
+    "#e879f9", "#34d399", "#f472b6", "#a78bfa", "#e2e8f0", "#fbbf24",
+]
+
+
+def save_overlay_plot(
+    wavelengths: np.ndarray,
+    targets: list[tuple[str, np.ndarray]],
+    out_path: str,
+) -> None:
+    """Save a plot with multiple target spectra overlaid."""
+    fig = go.Figure()
+
+    band = 10
+    for wl in range(int(wavelengths[0]), int(wavelengths[-1]) + 1, band):
+        fig.add_vrect(
+            x0=wl, x1=wl + band,
+            fillcolor=wavelength_to_rgb(wl + band // 2),
+            opacity=0.25, layer="below", line_width=0,
+        )
+
+    for i, (name, spectrum) in enumerate(targets):
+        colour = _OVERLAY_COLORS[i % len(_OVERLAY_COLORS)]
+        fig.add_trace(go.Scatter(
+            x=wavelengths, y=spectrum,
+            name=name,
+            line=dict(color=colour, width=2),
+        ))
+
+    fig.update_layout(
+        title="Target Spectra",
+        xaxis_title="Wavelength (nm)", yaxis_title="Intensity",
+        paper_bgcolor="#111", plot_bgcolor="#111", font_color="white",
+        legend=dict(bgcolor="#222"),
+        xaxis=dict(gridcolor="#333"), yaxis=dict(gridcolor="#333"),
+    )
+    fig.write_html(out_path)
+
+
 def save_comparison_plot(
     wavelengths: np.ndarray,
     target: np.ndarray,

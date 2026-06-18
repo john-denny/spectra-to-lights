@@ -11,6 +11,7 @@ from ._lib import (
     load_target,
     match_quality,
     save_comparison_plot,
+    save_overlay_plot,
     save_plot,
     seed_from_spectrum,
     zero_inactive_channels,
@@ -126,5 +127,40 @@ class SpectralSolver:
             reconstructed = self._A @ x
             sam, r2, rmse = match_quality(self._A, x, t)
             save_plot(WAVELENGTHS, t, reconstructed, sam, r2, rmse, out)
+        if open_browser:
+            webbrowser.open(pathlib.Path(out).resolve().as_uri())
+
+    def plot_targets(
+        self,
+        targets: "list[str | pathlib.Path | np.ndarray]",
+        *,
+        labels: "list[str] | None" = None,
+        out: str = "targets.html",
+        open_browser: bool = True,
+    ) -> None:
+        """Save a plot with multiple target spectra overlaid on one chart.
+
+        Parameters
+        ----------
+        targets:
+            List of CSV paths or pre-loaded (401,) arrays.
+        labels:
+            Display names for each target. Defaults to the filename stem for
+            CSV paths, or "Target 1", "Target 2", ... for arrays.
+        out:
+            Output HTML file path.
+        open_browser:
+            If True, open the saved file in the default browser.
+        """
+        named = []
+        for i, target in enumerate(targets):
+            if isinstance(target, np.ndarray):
+                label = labels[i] if labels else f"Target {i + 1}"
+                t = target
+            else:
+                label = labels[i] if labels else pathlib.Path(target).stem
+                t = self._load(target)
+            named.append((label, t))
+        save_overlay_plot(WAVELENGTHS, named, out)
         if open_browser:
             webbrowser.open(pathlib.Path(out).resolve().as_uri())
