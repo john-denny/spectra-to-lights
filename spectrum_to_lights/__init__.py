@@ -130,6 +130,39 @@ class SpectralSolver:
         if open_browser:
             webbrowser.open(pathlib.Path(out).resolve().as_uri())
 
+    def load_targets(
+        self,
+        targets: "list[str | pathlib.Path]",
+        *,
+        relative: bool = False,
+    ) -> "tuple[list[np.ndarray], list[str]]":
+        """Load multiple target spectra from CSV files.
+
+        Parameters
+        ----------
+        targets:
+            List of CSV paths.
+        relative:
+            If True, normalise all spectra to the peak of the brightest curve,
+            preserving relative magnitudes. If False, each curve is normalised
+            to its own peak.
+
+        Returns
+        -------
+        arrays:
+            List of (401,) arrays, one per target.
+        labels:
+            Filename stems, one per target.
+        """
+        raw = [load_target(str(t), reference=1.0) for t in targets]
+        labels = [pathlib.Path(str(t)).stem for t in targets]
+        if relative:
+            ref = max(a.max() for a in raw)
+            arrays = [a / ref if ref > 0 else a for a in raw]
+        else:
+            arrays = [a / a.max() if a.max() > 0 else a for a in raw]
+        return arrays, labels
+
     def plot_targets(
         self,
         targets: "list[str | pathlib.Path | np.ndarray]",
